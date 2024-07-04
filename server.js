@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
 const TelegramBot = require('node-telegram-bot-api');
 const WebSocket = require('ws');
 const http = require('http');
@@ -60,13 +59,13 @@ bot.onText(/\/start/, async (msg) => {
                 [
                     {
                         text: 'Играть',
-                        web_app: { url: 'https://7olyan.github.io/magley-game/' } // Замените на ваш URL
+                        web_app: { url: `https://7olyan.github.io/magley-game/?userId=${chatId}` } // Замените на ваш URL
                     }
                 ]
             ]
         }
     };
-    bot.sendMessage(chatId, 'V1 Для начала игры нажмите кнопку ниже', opts);
+    bot.sendMessage(chatId, 'Для начала игры нажмите кнопку ниже', opts);
 });
 
 // Serve static files from the "docs" directory
@@ -78,9 +77,6 @@ app.get('/', (req, res) => {
 
 // WebSocket connection
 wss.on('connection', (ws, req) => {
-    const id = uuidv4();
-    clients.set(id, ws);
-
     ws.on('message', async (message) => {
         const { userId, action } = JSON.parse(message);
 
@@ -97,7 +93,7 @@ wss.on('connection', (ws, req) => {
                     const totalClicks = players.reduce((acc, player) => acc + player.clicks, 0);
                     const sortedPlayers = players.sort((a, b) => b.clicks - a.clicks);
 
-                    clients.forEach((client) => {
+                    wss.clients.forEach((client) => {
                         if (client.readyState === WebSocket.OPEN) {
                             client.send(JSON.stringify({ totalClicks, leaderboard: sortedPlayers }));
                         }
@@ -107,10 +103,6 @@ wss.on('connection', (ws, req) => {
                 console.error('Error processing click', err);
             }
         }
-    });
-
-    ws.on('close', () => {
-        clients.delete(id);
     });
 });
 
