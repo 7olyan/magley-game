@@ -71,7 +71,7 @@ bot.onText(/\/start/, async (msg) => {
 app.use(express.static(path.join(__dirname, 'docs')));
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'docs', 'index.html'));
+    res.sendFile(path.join(__dirname, 'docs', 'old_index.html'));
 });
 
 // WebSocket connection
