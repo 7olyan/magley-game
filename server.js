@@ -22,7 +22,7 @@ const readFile = (path) => new Promise((resolve, reject) => {
 });
 
 const writeFile = (path, data) => new Promise((resolve, reject) => {
-    fs.writeFile(path, JSON.stringify(data), 'utf8', (err) => {
+    fs.writeFile(path, JSON.stringify(data, null, 2), 'utf8', (err) => {
         if (err) reject(err);
         else resolve();
     });
