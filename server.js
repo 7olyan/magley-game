@@ -3,9 +3,13 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const TelegramBot = require('node-telegram-bot-api');
+const util = require('util');
 
 const app = express();
 const port = 3000;
+
+const readFile = util.promisify(fs.readFile);
+const writeFile = util.promisify(fs.writeFile);
 
 const dataPath = path.join(__dirname, 'data.json');
 
@@ -13,30 +17,25 @@ const dataPath = path.join(__dirname, 'data.json');
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_API_KEY, { polling: true });
 
 // Обработка команды /start
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
     const firstName = msg.from.first_name || '';
     const lastName = msg.from.last_name || '';
     const fullName = `${firstName} ${lastName}`.trim();
 
-    fs.readFile(dataPath, 'utf8', (err, data) => {
-        if (err) {
-            console.error('Error reading data', err);
-        } else {
-            const jsonData = JSON.parse(data);
-            const players = jsonData.players || [];
-            const player = players.find(p => p.id === chatId);
+    try {
+        const data = await readFile(dataPath, 'utf8');
+        const jsonData = JSON.parse(data);
+        const players = jsonData.players || [];
+        const player = players.find(p => p.id === chatId);
 
-            if (!player) {
-                players.push({ id: chatId, name: fullName, clicks: 0 });
-                fs.writeFile(dataPath, JSON.stringify({ players }), 'utf8', (err) => {
-                    if (err) {
-                        console.error('Error saving data', err);
-                    }
-                });
-            }
+        if (!player) {
+            players.push({ id: chatId, name: fullName, clicks: 0 });
+            await writeFile(dataPath, JSON.stringify({ players }), 'utf8');
         }
-    });
+    } catch (err) {
+        console.error('Error handling /start command', err);
+    }
 
     const opts = {
         reply_markup: {
@@ -53,7 +52,7 @@ bot.onText(/\/start/, (msg) => {
     bot.sendMessage(chatId, 'Для начала игры нажмите кнопку ниже', opts);
 });
 
-// Serve static files from the "public" directory
+// Serve static files from the "docs" directory
 app.use(express.static(path.join(__dirname, 'docs')));
 
 app.get('/', (req, res) => {
@@ -61,46 +60,54 @@ app.get('/', (req, res) => {
 });
 
 // Endpoint to handle click
-app.post('/click', express.json(), (req, res) => {
+app.post('/click', express.json(), async (req, res) => {
     const { user } = req.body;
 
-    fs.readFile(dataPath, 'utf8', (err, data) => {
-        if (err) {
-            res.status(500).send('Error reading data');
+    try {
+        const data = await readFile(dataPath, 'utf8');
+        const jsonData = JSON.parse(data);
+        const players = jsonData.players || [];
+        const player = players.find(p => p.name === user);
+
+        if (player) {
+            player.clicks += 1;
         } else {
-            const jsonData = JSON.parse(data);
-            const players = jsonData.players || [];
-            const player = players.find(p => p.name === user);
-
-            if (player) {
-                player.clicks += 1;
-            }
-
-            fs.writeFile(dataPath, JSON.stringify({ players }), 'utf8', (err) => {
-                if (err) {
-                    res.status(500).send('Error saving data');
-                } else {
-                    res.status(201).send('Click recorded');
-                }
-            });
+            players.push({ name: user, clicks: 1 });
         }
-    });
+
+        await writeFile(dataPath, JSON.stringify({ players }), 'utf8');
+        res.status(201).send('Click recorded');
+    } catch (err) {
+        res.status(500).send('Error processing click');
+    }
 });
 
 // Endpoint to get leaderboard
-app.get('/leaderboard', (req, res) => {
-    fs.readFile(dataPath, 'utf8', (err, data) => {
-        if (err) {
-            res.status(500).send('Error reading data');
-        } else {
-            const jsonData = JSON.parse(data);
-            const players = jsonData.players || [];
-            const sortedPlayers = players.sort((a, b) => b.clicks - a.clicks);
-            res.send(sortedPlayers);
-        }
-    });
+app.get('/leaderboard', async (req, res) => {
+    try {
+        const data = await readFile(dataPath, 'utf8');
+        const jsonData = JSON.parse(data);
+        const players = jsonData.players || [];
+        const sortedPlayers = players.sort((a, b) => b.clicks - a.clicks);
+        res.send(sortedPlayers);
+    } catch (err) {
+        res.status(500).send('Error reading leaderboard');
+    }
+});
+
+// Endpoint to get total clicks
+app.get('/total-clicks', async (req, res) => {
+    try {
+        const data = await readFile(dataPath, 'utf8');
+        const jsonData = JSON.parse(data);
+        const totalClicks = jsonData.players.reduce((acc, player) => acc + player.clicks, 0);
+        res.send({ totalClicks });
+    } catch (err) {
+        res.status(500).send('Error reading total clicks');
+    }
 });
 
 app.listen(port, () => {
     console.log(`Magley's Accord is racing!`);
 });
+

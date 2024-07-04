@@ -43,15 +43,18 @@
 <div id="leaderboard">Лидерборд:</div>
 
 <script>
-    let totalClicks = 0;
+    let userName = 'test-user'; // Замените на реальное имя пользователя
     const clickArea = document.getElementById('click-area');
     const counter = document.getElementById('counter');
     const leaderboard = document.getElementById('leaderboard');
 
-    clickArea.addEventListener('click', (event) => {
-        totalClicks++;
-        counter.textContent = `Общий счёт: ${totalClicks}`;
+    async function fetchTotalClicks() {
+        const response = await fetch('/total-clicks');
+        const data = await response.json();
+        counter.textContent = `Общий счёт: ${data.totalClicks}`;
+    }
 
+    clickArea.addEventListener('click', (event) => {
         const x = event.clientX;
         const y = event.clientY;
 
@@ -71,8 +74,8 @@
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ user: 'test-user' })
-        });
+            body: JSON.stringify({ user: userName })
+        }).then(() => fetchTotalClicks());
     });
 
     function updateLeaderboard(players) {
@@ -85,6 +88,7 @@
         updateLeaderboard(players);
     }
 
+    fetchTotalClicks();
     setInterval(fetchLeaderboard, 5000);
 </script>
 </body>
