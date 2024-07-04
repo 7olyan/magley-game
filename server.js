@@ -31,8 +31,6 @@ const writeFile = (path, data) => new Promise((resolve, reject) => {
 // Создаем экземпляр бота
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_API_KEY, { polling: true });
 
-const clients = new Map();
-
 // Обработка команды /start
 bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
@@ -59,7 +57,7 @@ bot.onText(/\/start/, async (msg) => {
                 [
                     {
                         text: 'Играть',
-                        web_app: { url: `https://7olyan.github.io/magley-game/?userId=${chatId}` } // Замените на ваш URL
+                        web_app: { url: `https://7olyan.github.io/magley-game/?userId=${chatId}` }
                     }
                 ]
             ]
@@ -76,7 +74,7 @@ app.get('/', (req, res) => {
 });
 
 // WebSocket connection
-wss.on('connection', (ws, req) => {
+wss.on('connection', (ws) => {
     ws.on('message', async (message) => {
         const { userId, action } = JSON.parse(message);
 
