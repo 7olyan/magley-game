@@ -43,7 +43,15 @@
 <div id="leaderboard">Лидерборд:</div>
 
 <script>
-    let userName = 'test-user'; // Замените на реальное имя пользователя
+    const urlParams = new URLSearchParams(window.location.search);
+    const userName = urlParams.get('user');
+
+    if (!userName) {
+        document.getElementById('click-area').textContent = 'Доступ запрещен';
+        document.getElementById('click-area').style.cursor = 'not-allowed';
+        return;
+    }
+
     const clickArea = document.getElementById('click-area');
     const counter = document.getElementById('counter');
     const leaderboard = document.getElementById('leaderboard');

@@ -1,15 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
 const TelegramBot = require('node-telegram-bot-api');
-const util = require('util');
 
 const app = express();
 const port = 3000;
-
-const readFile = util.promisify(fs.readFile);
-const writeFile = util.promisify(fs.writeFile);
 
 const dataPath = path.join(__dirname, 'data.json');
 
@@ -24,14 +20,14 @@ bot.onText(/\/start/, async (msg) => {
     const fullName = `${firstName} ${lastName}`.trim();
 
     try {
-        const data = await readFile(dataPath, 'utf8');
+        const data = await fs.readFile(dataPath, 'utf8');
         const jsonData = JSON.parse(data);
         const players = jsonData.players || [];
         const player = players.find(p => p.id === chatId);
 
         if (!player) {
             players.push({ id: chatId, name: fullName, clicks: 0 });
-            await writeFile(dataPath, JSON.stringify({ players }), 'utf8');
+            await fs.writeFile(dataPath, JSON.stringify({ players }), 'utf8');
         }
     } catch (err) {
         console.error('Error handling /start command', err);
@@ -43,7 +39,7 @@ bot.onText(/\/start/, async (msg) => {
                 [
                     {
                         text: 'Играть',
-                        web_app: { url: 'https://7olyan.github.io/magley-game/' } // Замените на ваш URL
+                        web_app: { url: `https://7olyan.github.io/magley-game/?user=${encodeURIComponent(fullName)}` }
                     }
                 ]
             ]
@@ -64,7 +60,7 @@ app.post('/click', express.json(), async (req, res) => {
     const { user } = req.body;
 
     try {
-        const data = await readFile(dataPath, 'utf8');
+        const data = await fs.readFile(dataPath, 'utf8');
         const jsonData = JSON.parse(data);
         const players = jsonData.players || [];
         const player = players.find(p => p.name === user);
@@ -75,7 +71,7 @@ app.post('/click', express.json(), async (req, res) => {
             players.push({ name: user, clicks: 1 });
         }
 
-        await writeFile(dataPath, JSON.stringify({ players }), 'utf8');
+        await fs.writeFile(dataPath, JSON.stringify({ players }), 'utf8');
         res.status(201).send('Click recorded');
     } catch (err) {
         res.status(500).send('Error processing click');
@@ -85,7 +81,7 @@ app.post('/click', express.json(), async (req, res) => {
 // Endpoint to get leaderboard
 app.get('/leaderboard', async (req, res) => {
     try {
-        const data = await readFile(dataPath, 'utf8');
+        const data = await fs.readFile(dataPath, 'utf8');
         const jsonData = JSON.parse(data);
         const players = jsonData.players || [];
         const sortedPlayers = players.sort((a, b) => b.clicks - a.clicks);
@@ -98,7 +94,7 @@ app.get('/leaderboard', async (req, res) => {
 // Endpoint to get total clicks
 app.get('/total-clicks', async (req, res) => {
     try {
-        const data = await readFile(dataPath, 'utf8');
+        const data = await fs.readFile(dataPath, 'utf8');
         const jsonData = JSON.parse(data);
         const totalClicks = jsonData.players.reduce((acc, player) => acc + player.clicks, 0);
         res.send({ totalClicks });
@@ -108,6 +104,5 @@ app.get('/total-clicks', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Magley's Accord is racing!`);
+    console.log(`Started`);
 });
-
