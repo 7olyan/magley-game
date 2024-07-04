@@ -10,12 +10,82 @@
             margin: 0;
             height: 100vh;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
+            position: relative;
+        }
+        #click-area {
+            font-size: 48px;
+            cursor: pointer;
+        }
+        .click-effect {
+            position: absolute;
+            font-size: 24px;
+            color: red;
+            animation: fade 1s forwards;
+        }
+        @keyframes fade {
+            to {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+        }
+        #counter, #leaderboard {
+            margin-top: 20px;
+            font-size: 24px;
         }
     </style>
 </head>
 <body>
-<h1>Welcome to Telegram Game</h1>
+<div id="click-area">нажми</div>
+<div id="counter">Общий счёт: 0</div>
+<div id="leaderboard">Лидерборд:</div>
+
+<script>
+    let totalClicks = 0;
+    const clickArea = document.getElementById('click-area');
+    const counter = document.getElementById('counter');
+    const leaderboard = document.getElementById('leaderboard');
+
+    clickArea.addEventListener('click', (event) => {
+        totalClicks++;
+        counter.textContent = `Общий счёт: ${totalClicks}`;
+
+        const x = event.clientX;
+        const y = event.clientY;
+
+        const effect = document.createElement('div');
+        effect.textContent = '+1';
+        effect.classList.add('click-effect');
+        effect.style.left = `${x}px`;
+        effect.style.top = `${y}px`;
+        document.body.appendChild(effect);
+
+        setTimeout(() => {
+            effect.remove();
+        }, 1000);
+
+        fetch('/click', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ user: 'test-user' })
+        });
+    });
+
+    function updateLeaderboard(players) {
+        leaderboard.innerHTML = 'Лидерборд:<br>' + players.map(p => `${p.name}: ${p.clicks}`).join('<br>');
+    }
+
+    async function fetchLeaderboard() {
+        const response = await fetch('/leaderboard');
+        const players = await response.json();
+        updateLeaderboard(players);
+    }
+
+    setInterval(fetchLeaderboard, 5000);
+</script>
 </body>
 </html>
