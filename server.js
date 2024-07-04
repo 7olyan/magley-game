@@ -1,16 +1,38 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
 const TelegramBot = require('node-telegram-bot-api');
+const WebSocket = require('ws');
+const http = require('http');
 
 const app = express();
 const port = 3000;
 
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
 const dataPath = path.join(__dirname, 'data.json');
+
+const readFile = (path) => new Promise((resolve, reject) => {
+    fs.readFile(path, 'utf8', (err, data) => {
+        if (err) reject(err);
+        else resolve(JSON.parse(data));
+    });
+});
+
+const writeFile = (path, data) => new Promise((resolve, reject) => {
+    fs.writeFile(path, JSON.stringify(data), 'utf8', (err) => {
+        if (err) reject(err);
+        else resolve();
+    });
+});
 
 // Создаем экземпляр бота
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_API_KEY, { polling: true });
+
+const clients = new Map();
 
 // Обработка команды /start
 bot.onText(/\/start/, async (msg) => {
@@ -20,14 +42,13 @@ bot.onText(/\/start/, async (msg) => {
     const fullName = `${firstName} ${lastName}`.trim();
 
     try {
-        const data = await fs.readFile(dataPath, 'utf8');
-        const jsonData = JSON.parse(data);
-        const players = jsonData.players || [];
+        const data = await readFile(dataPath);
+        const players = data.players || [];
         const player = players.find(p => p.id === chatId);
 
         if (!player) {
             players.push({ id: chatId, name: fullName, clicks: 0 });
-            await fs.writeFile(dataPath, JSON.stringify({ players }), 'utf8');
+            await writeFile(dataPath, { players });
         }
     } catch (err) {
         console.error('Error handling /start command', err);
@@ -39,13 +60,13 @@ bot.onText(/\/start/, async (msg) => {
                 [
                     {
                         text: 'Играть',
-                        web_app: { url: `https://7olyan.github.io/magley-game/?chatId=${chatId}` }
+                        web_app: { url: 'https://7olyan.github.io/magley-game/' } // Замените на ваш URL
                     }
                 ]
             ]
         }
     };
-    bot.sendMessage(chatId, 'Для начала игры нажмите кнопку ниже', opts);
+    bot.sendMessage(chatId, 'V1 Для начала игры нажмите кнопку ниже', opts);
 });
 
 // Serve static files from the "docs" directory
@@ -55,53 +76,44 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'docs', 'index.html'));
 });
 
-// Endpoint to handle click
-app.post('/click', express.json(), async (req, res) => {
-    const { chatId } = req.body;
+// WebSocket connection
+wss.on('connection', (ws, req) => {
+    const id = uuidv4();
+    clients.set(id, ws);
 
-    try {
-        const data = await fs.readFile(dataPath, 'utf8');
-        const jsonData = JSON.parse(data);
-        const players = jsonData.players || [];
-        const player = players.find(p => p.id === chatId);
+    ws.on('message', async (message) => {
+        const { userId, action } = JSON.parse(message);
 
-        if (player) {
-            player.clicks += 1;
-            await fs.writeFile(dataPath, JSON.stringify({ players }), 'utf8');
-            res.status(201).send('Click recorded');
-        } else {
-            res.status(404).send('Player not found');
+        if (action === 'click') {
+            try {
+                const data = await readFile(dataPath);
+                const players = data.players || [];
+                const player = players.find(p => p.id === userId);
+
+                if (player) {
+                    player.clicks += 1;
+                    await writeFile(dataPath, { players });
+
+                    const totalClicks = players.reduce((acc, player) => acc + player.clicks, 0);
+                    const sortedPlayers = players.sort((a, b) => b.clicks - a.clicks);
+
+                    clients.forEach((client) => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({ totalClicks, leaderboard: sortedPlayers }));
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error('Error processing click', err);
+            }
         }
-    } catch (err) {
-        res.status(500).send('Error processing click');
-    }
+    });
+
+    ws.on('close', () => {
+        clients.delete(id);
+    });
 });
 
-// Endpoint to get leaderboard
-app.get('/leaderboard', async (req, res) => {
-    try {
-        const data = await fs.readFile(dataPath, 'utf8');
-        const jsonData = JSON.parse(data);
-        const players = jsonData.players || [];
-        const sortedPlayers = players.sort((a, b) => b.clicks - a.clicks);
-        res.send(sortedPlayers);
-    } catch (err) {
-        res.status(500).send('Error reading leaderboard');
-    }
-});
-
-// Endpoint to get total clicks
-app.get('/total-clicks', async (req, res) => {
-    try {
-        const data = await fs.readFile(dataPath, 'utf8');
-        const jsonData = JSON.parse(data);
-        const totalClicks = jsonData.players.reduce((acc, player) => acc + player.clicks, 0);
-        res.send({ totalClicks });
-    } catch (err) {
-        res.status(500).send('Error reading total clicks');
-    }
-});
-
-app.listen(port, () => {
-    console.log(`Server is running`);
+server.listen(port, () => {
+    console.log(`Server is running at http://localhost:${port}`);
 });

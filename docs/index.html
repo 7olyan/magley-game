@@ -44,23 +44,18 @@
 
 <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const chatId = urlParams.get('chatId');
-
-    if (!chatId) {
-        document.getElementById('click-area').textContent = 'Доступ запрещен';
-        document.getElementById('click-area').style.cursor = 'not-allowed';
-        return;
-    }
-
+    const userId = urlParams.get('userId'); // Получаем userId из параметров URL
     const clickArea = document.getElementById('click-area');
     const counter = document.getElementById('counter');
     const leaderboard = document.getElementById('leaderboard');
 
-    async function fetchTotalClicks() {
-        const response = await fetch('/total-clicks');
-        const data = await response.json();
+    const ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}`);
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
         counter.textContent = `V1 Общий счёт: ${data.totalClicks}`;
-    }
+        updateLeaderboard(data.leaderboard);
+    };
 
     clickArea.addEventListener('click', (event) => {
         const x = event.clientX;
@@ -77,27 +72,14 @@
             effect.remove();
         }, 1000);
 
-        fetch('/click', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ chatId })
-        }).then(() => fetchTotalClicks());
+        if (userId) {
+            ws.send(JSON.stringify({ userId, action: 'click' }));
+        }
     });
 
     function updateLeaderboard(players) {
         leaderboard.innerHTML = 'Лидерборд:<br>' + players.map(p => `${p.name}: ${p.clicks}`).join('<br>');
     }
-
-    async function fetchLeaderboard() {
-        const response = await fetch('/leaderboard');
-        const players = await response.json();
-        updateLeaderboard(players);
-    }
-
-    fetchTotalClicks();
-    setInterval(fetchLeaderboard, 5000);
 </script>
 </body>
 </html>
