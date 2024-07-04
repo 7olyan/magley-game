@@ -44,9 +44,9 @@
 
 <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const userName = urlParams.get('user');
+    const chatId = urlParams.get('chatId');
 
-    if (!userName) {
+    if (!chatId) {
         document.getElementById('click-area').textContent = 'Доступ запрещен';
         document.getElementById('click-area').style.cursor = 'not-allowed';
         return;
@@ -82,7 +82,7 @@
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ user: userName })
+            body: JSON.stringify({ chatId })
         }).then(() => fetchTotalClicks());
     });
 

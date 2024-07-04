@@ -39,7 +39,7 @@ bot.onText(/\/start/, async (msg) => {
                 [
                     {
                         text: 'Играть',
-                        web_app: { url: `https://7olyan.github.io/magley-game/?user=${encodeURIComponent(fullName)}` }
+                        web_app: { url: `https://7olyan.github.io/magley-game/?chatId=${chatId}` }
                     }
                 ]
             ]
@@ -57,22 +57,21 @@ app.get('/', (req, res) => {
 
 // Endpoint to handle click
 app.post('/click', express.json(), async (req, res) => {
-    const { user } = req.body;
+    const { chatId } = req.body;
 
     try {
         const data = await fs.readFile(dataPath, 'utf8');
         const jsonData = JSON.parse(data);
         const players = jsonData.players || [];
-        const player = players.find(p => p.name === user);
+        const player = players.find(p => p.id === chatId);
 
         if (player) {
             player.clicks += 1;
+            await fs.writeFile(dataPath, JSON.stringify({ players }), 'utf8');
+            res.status(201).send('Click recorded');
         } else {
-            players.push({ name: user, clicks: 1 });
+            res.status(404).send('Player not found');
         }
-
-        await fs.writeFile(dataPath, JSON.stringify({ players }), 'utf8');
-        res.status(201).send('Click recorded');
     } catch (err) {
         res.status(500).send('Error processing click');
     }
@@ -104,5 +103,5 @@ app.get('/total-clicks', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Started`);
+    console.log(`Server is running`);
 });
