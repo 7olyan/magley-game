@@ -59,7 +59,7 @@
     async function fetchTotalClicks() {
         const response = await fetch('/total-clicks');
         const data = await response.json();
-        counter.textContent = `Общий счёт: ${data.totalClicks}`;
+        counter.textContent = `V1 Общий счёт: ${data.totalClicks}`;
     }
 
     clickArea.addEventListener('click', (event) => {
