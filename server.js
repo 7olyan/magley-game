@@ -5,6 +5,7 @@ const fs = require('fs');
 const TelegramBot = require('node-telegram-bot-api');
 const WebSocket = require('ws');
 const http = require('http');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const port = 3000;
@@ -76,14 +77,23 @@ app.get('/', (req, res) => {
 // WebSocket connection
 wss.on('connection', (ws) => {
     ws.on('message', async (message) => {
-        const { userId, action } = JSON.parse(message);
+        const { userId, action, name } = JSON.parse(message);
 
-        if (action === 'click') {
-            try {
-                const data = await readFile(dataPath);
-                const players = data.players || [];
+        try {
+            const data = await readFile(dataPath);
+            const players = data.players || [];
+
+            if (action === 'register') {
                 const player = players.find(p => p.id === userId);
+                if (!player) {
+                    players.push({ id: userId, name: name, clicks: 0 });
+                    await writeFile(dataPath, { players });
+                }
+                ws.send(JSON.stringify({ action: 'registered', userId }));
+            }
 
+            if (action === 'click') {
+                const player = players.find(p => p.id === userId);
                 if (player) {
                     player.clicks += 1;
                     await writeFile(dataPath, { players });
@@ -97,9 +107,9 @@ wss.on('connection', (ws) => {
                         }
                     });
                 }
-            } catch (err) {
-                console.error('Error processing click', err);
             }
+        } catch (err) {
+            console.error('Error processing message', err);
         }
     });
 });

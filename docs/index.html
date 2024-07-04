@@ -18,6 +18,7 @@
         #click-area {
             font-size: 48px;
             cursor: pointer;
+            display: none;
         }
         .click-effect {
             position: absolute;
@@ -35,26 +36,67 @@
             margin-top: 20px;
             font-size: 24px;
         }
+        #name-form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #name-input {
+            font-size: 24px;
+            padding: 10px;
+            margin: 10px;
+        }
+        #start-button {
+            font-size: 24px;
+            padding: 10px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
-<div id="click-area">нажми</div>
+<div id="name-form">
+    <input id="name-input" type="text" placeholder="Введите ваше имя">
+    <button id="start-button">Играть</button>
+</div>
+<div id="click-area">Нажми</div>
 <div id="counter">Общий счёт: 0</div>
 <div id="leaderboard">Лидерборд:</div>
 
 <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const userId = urlParams.get('userId');
+    const userId = localStorage.getItem('userId') || `user-${Math.random().toString(36).substr(2, 9)}`;
+    const ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}`);
+
+    const nameForm = document.getElementById('name-form');
+    const nameInput = document.getElementById('name-input');
+    const startButton = document.getElementById('start-button');
     const clickArea = document.getElementById('click-area');
     const counter = document.getElementById('counter');
     const leaderboard = document.getElementById('leaderboard');
 
-    const ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}`);
+    if (localStorage.getItem('userName')) {
+        nameForm.style.display = 'none';
+        clickArea.style.display = 'block';
+    }
+
+    startButton.addEventListener('click', () => {
+        const name = nameInput.value.trim();
+        if (name) {
+            localStorage.setItem('userId', userId);
+            localStorage.setItem('userName', name);
+            ws.send(JSON.stringify({ userId, action: 'register', name }));
+            nameForm.style.display = 'none';
+            clickArea.style.display = 'block';
+        }
+    });
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        counter.textContent = `Общий счёт: ${data.totalClicks}`;
-        updateLeaderboard(data.leaderboard);
+        if (data.action === 'registered') {
+            localStorage.setItem('userId', data.userId);
+        } else {
+            counter.textContent = `Общий счёт: ${data.totalClicks}`;
+            updateLeaderboard(data.leaderboard);
+        }
     };
 
     clickArea.addEventListener('click', (event) => {
@@ -72,7 +114,7 @@
             effect.remove();
         }, 1000);
 
-        if (userId) {
+        if (localStorage.getItem('userId')) {
             ws.send(JSON.stringify({ userId, action: 'click' }));
         }
     });
